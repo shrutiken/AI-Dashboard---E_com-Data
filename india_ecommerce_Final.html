@@ -1,0 +1,233 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>E-Com India Pro | Negative Profit Support</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #020617;
+            --card-bg: #1e293b;
+            --text-primary: #f8fafc;
+            --accent-cyan: #22d3ee;
+            --accent-pink: #f472b6;
+            --accent-red: #ef4444;
+            --border-color: #334155;
+        }
+        body, html {
+            margin: 0; padding: 0; width: 100vw; height: 100vh;
+            font-family: 'Segoe UI', sans-serif; background-color: var(--bg-color);
+            color: var(--text-primary); overflow: hidden;
+        }
+        #upload-screen {
+            display: flex; justify-content: center; align-items: center;
+            height: 100vh; width: 100vw; position: absolute; z-index: 1000;
+            background: var(--bg-color);
+        }
+        .upload-btn {
+            background: linear-gradient(135deg, var(--accent-cyan), #a855f7);
+            color: white; padding: 15px 30px; border-radius: 8px;
+            cursor: pointer; font-size: 1.2rem; font-weight: bold;
+        }
+        #dashboard { display: none; flex-direction: column; height: 100vh; width: 100vw; padding: 8px; box-sizing: border-box; }
+        .top-row { display: flex; height: 10vh; gap: 8px; margin-bottom: 8px; }
+        .controls-card { flex: 1.2; background: var(--card-bg); padding: 5px; border-radius: 6px; display: flex; align-items: center; justify-content: space-around; border: 1px solid var(--border-color); font-size: 0.7rem; }
+        .state-dropdown-container { position: relative; width: 140px; }
+        #stateDropdownHeader { background: #0f172a; border: 1px solid var(--accent-cyan); padding: 4px; border-radius: 4px; cursor: pointer; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        #stateList { position: absolute; top: 100%; left: 0; width: 200px; max-height: 250px; background: #1e293b; border: 1px solid var(--accent-cyan); overflow-y: auto; display: none; z-index: 2000; border-radius: 4px; }
+        .state-item { display: flex; align-items: center; gap: 6px; padding: 4px; cursor: pointer; font-size: 0.7rem; }
+        .kpi-row { flex: 2; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+        .kpi-card { background: var(--card-bg); border-bottom: 2px solid var(--accent-cyan); border-radius: 6px; display: flex; flex-direction: column; justify-content: center; align-items: center; border: 1px solid var(--border-color); }
+        .kpi-value { font-size: 0.95rem; font-weight: bold; color: var(--accent-cyan); }
+        .kpi-label { font-size: 0.6rem; text-transform: uppercase; color: #94a3b8; }
+        .chart-grid { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(2, 1fr); gap: 8px; height: 88vh; }
+        .chart-card { background: var(--card-bg); border-radius: 8px; padding: 8px; border: 1px solid var(--border-color); display: flex; flex-direction: column; position: relative; min-height: 0; }
+        .chart-title { font-size: 0.65rem; margin-bottom: 2px; color: #cbd5e1; font-weight: bold; text-transform: uppercase; }
+        .chart-container { flex: 1; position: relative; min-height: 0; width: 100%; }
+        .q-btn { background: #0f172a; color: white; border: 1px solid var(--accent-cyan); padding: 2px 5px; border-radius: 3px; cursor: pointer; font-size: 0.65rem; }
+        .q-btn.active { background: var(--accent-cyan); color: #000; }
+        .reset-btn { background: var(--accent-pink); color: white; border: none; padding: 2px 6px; border-radius: 3px; cursor: pointer; font-size: 0.65rem; display: none; }
+    </style>
+</head>
+<body>
+<div id="upload-screen">
+    <label class="upload-btn">Upload .xlsm File<input type="file" id="fileInput" accept=".xlsm, .xlsx" style="display:none"></label>
+</div>
+<div id="dashboard">
+    <div class="top-row">
+        <div class="controls-card">
+            <div style="font-weight:bold">QTR:</div>
+            <div style="display:flex; gap:2px;">
+                <button class="q-btn active" onclick="filterQuarter(0)">ALL</button>
+                <button class="q-btn" onclick="filterQuarter(1)">Q1</button>
+                <button class="q-btn" onclick="filterQuarter(2)">Q2</button>
+                <button class="q-btn" onclick="filterQuarter(3)">Q3</button>
+                <button class="q-btn" onclick="filterQuarter(4)">Q4</button>
+            </div>
+            <div class="state-dropdown-container">
+                <div id="stateDropdownHeader" onclick="toggleStateList()">All States</div>
+                <div id="stateList"></div>
+            </div>
+            <button id="resetFilter" class="reset-btn" onclick="resetCrossFilter()">Reset</button>
+        </div>
+        <div class="kpi-row">
+            <div class="kpi-card"><div class="kpi-label">Amount</div><div id="kpi-amt" class="kpi-value">₹0</div></div>
+            <div class="kpi-card"><div class="kpi-label">Quantity</div><div id="kpi-qty" class="kpi-value">0</div></div>
+            <div class="kpi-card"><div class="kpi-label">Profit</div><div id="kpi-profit" class="kpi-value">₹0</div></div>
+            <div class="kpi-card"><div class="kpi-label">Avg. AOV</div><div id="kpi-aov" class="kpi-value">₹0</div></div>
+        </div>
+    </div>
+    <div class="chart-grid">
+        <div class="chart-card"><div class="chart-title">Top 5 States</div><div class="chart-container"><canvas id="c1"></canvas></div></div>
+        <div class="chart-card"><div class="chart-title">Qty by Payment</div><div class="chart-container"><canvas id="c2"></canvas></div></div>
+        <div class="chart-card"><div class="chart-title">Profit by Category</div><div class="chart-container"><canvas id="c3"></canvas></div></div>
+        <div class="chart-card"><div class="chart-title">AOV by Category</div><div class="chart-container"><canvas id="c4"></canvas></div></div>
+        <div class="chart-card"><div class="chart-title">Category %</div><div class="chart-container"><canvas id="c5"></canvas></div></div>
+        <div class="chart-card"><div class="chart-title">Payment %</div><div class="chart-container"><canvas id="c6"></canvas></div></div>
+    </div>
+</div>
+<script>
+    Chart.register(ChartDataLabels);
+    let rawData = [], charts = {}, selectedQuarter = 0, selectedStates = new Set(), drillDownFilter = null;
+    document.getElementById('fileInput').addEventListener('change', function(e) {
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+            const workbook = XLSX.read(evt.target.result, {type: 'binary', cellDates: true});
+            rawData = XLSX.utils.sheet_to_json(workbook.Sheets['Details'] || workbook.Sheets[workbook.SheetNames[0]]);
+            initDashboard();
+        };
+        reader.readAsBinaryString(e.target.files[0]);
+    });
+    function initDashboard() {
+        document.getElementById('upload-screen').style.display = 'none';
+        document.getElementById('dashboard').style.display = 'flex';
+        const states = [...new Set(rawData.map(d => d.State || 'Unknown'))].sort();
+        const list = document.getElementById('stateList');
+        list.innerHTML = '<div class="state-item"><input type="checkbox" id="allStates" checked onchange="toggleAllStates(this.checked)"><span>[ ALL ]</span></div>';
+        states.forEach(s => { selectedStates.add(s); list.innerHTML += `<div class="state-item"><input type="checkbox" class="state-cb" checked value="${s}" onchange="updateStates()"><span>${s}</span></div>`; });
+        updateCharts();
+    }
+    function toggleStateList() { document.getElementById('stateList').style.display = (document.getElementById('stateList').style.display==='block'?'none':'block'); }
+    function toggleAllStates(c) { document.querySelectorAll('.state-cb').forEach(x => x.checked = c); updateStates(); }
+    function updateStates() {
+        selectedStates.clear();
+        document.querySelectorAll('.state-cb').forEach(x => { if(x.checked) selectedStates.add(x.value); });
+        document.getElementById('stateDropdownHeader').innerText = selectedStates.size + " States";
+        updateCharts();
+    }
+    function filterQuarter(q) { selectedQuarter = q; document.querySelectorAll('.q-btn').forEach((b,i)=>b.classList.toggle('active', i===q)); updateCharts(); }
+    function resetCrossFilter() { drillDownFilter = null; document.getElementById('resetFilter').style.display = 'none'; updateCharts(); }
+
+    function updateCharts() {
+        const filtered = rawData.filter(d => {
+            if (!selectedStates.has(d.State)) return false;
+            if (selectedQuarter !== 0) {
+                const date = new Date(d['Order Date']);
+                if (Math.floor(date.getMonth() / 3) + 1 !== selectedQuarter) return false;
+            }
+            if (drillDownFilter) { if (d[drillDownFilter.key] !== drillDownFilter.value) return false; }
+            return true;
+        });
+        const totalAmt = filtered.reduce((a, b) => a + (Number(b.Amount) || 0), 0);
+        const totalQty = filtered.reduce((a, b) => a + (Number(b.Quantity) || 0), 0);
+        const totalProfit = filtered.reduce((a, b) => a + (Number(b.Profit) || 0), 0);
+        const avgAov = filtered.length ? filtered.reduce((a, b) => a + ((Number(b.Amount) || 0) / (Number(b.Quantity) || 1)), 0) / filtered.length : 0;
+        document.getElementById('kpi-amt').innerText = '₹' + Math.round(totalAmt).toLocaleString('en-IN');
+        document.getElementById('kpi-qty').innerText = totalQty.toLocaleString('en-IN');
+        document.getElementById('kpi-profit').innerText = '₹' + Math.round(totalProfit).toLocaleString('en-IN');
+        document.getElementById('kpi-aov').innerText = '₹' + Math.round(avgAov).toLocaleString('en-IN');
+        renderCharts(filtered);
+    }
+
+    function renderCharts(data) {
+        const colors = ['#22d3ee', '#f472b6', '#a855f7', '#4ade80', '#fbbf24', '#f87171'];
+        Chart.defaults.color = '#94a3b8';
+        Chart.defaults.font.size = 8.5;
+        const group = (arr, key, val) => {
+            const m = {};
+            arr.forEach(d => { m[d[key]] = (m[d[key]] || 0) + (Number(d[val]) || 0); });
+            return m;
+        };
+        const barOptions = (key, isProfit = false) => ({
+            maintainAspectRatio: false,
+            layout: { padding: { top: 20, bottom: 20 } },
+            plugins: {
+                legend: { display: false },
+                datalabels: { 
+                    anchor: (ctx) => ctx.dataset.data[ctx.dataIndex] < 0 ? 'start' : 'end',
+                    align: (ctx) => ctx.dataset.data[ctx.dataIndex] < 0 ? 'bottom' : 'top',
+                    color: '#fff', font: { weight: 'bold' }, formatter: Math.round 
+                }
+            },
+            scales: { 
+                y: { display: true, grid: { color: '#334155' }, ticks: { font: { size: 7 } } }, 
+                x: { 
+                    grid: { display: false }, 
+                    ticks: { font: { size: 7 } } 
+                } 
+            },
+            onClick: (e, el) => { if(el.length) { drillDownFilter = {key, value: charts[Object.keys(charts).find(k => charts[k].canvas.id === e.chart.canvas.id)].data.labels[el[0].index]}; document.getElementById('resetFilter').style.display='inline-block'; updateCharts(); }}
+        });
+        const destroy = (id) => { if(charts[id]) charts[id].destroy(); };
+
+        destroy('c1');
+        let sData = Object.entries(group(data, 'State', 'Amount')).sort((a,b)=>b[1]-a[1]).slice(0,5);
+        charts.c1 = new Chart(document.getElementById('c1'), { type: 'bar', data: { labels: sData.map(x=>x[0]), datasets: [{ data: sData.map(x=>x[1]), backgroundColor: colors[0] }]}, options: barOptions('State') });
+
+        destroy('c2');
+        let pData = group(data, 'PaymentMode', 'Quantity');
+        charts.c2 = new Chart(document.getElementById('c2'), { type: 'bar', data: { labels: Object.keys(pData), datasets: [{ data: Object.values(pData), backgroundColor: colors[1] }]}, options: barOptions('PaymentMode') });
+
+        destroy('c3');
+        let cProfData = group(data, 'Category', 'Profit');
+        let profLabels = Object.keys(cProfData);
+        let profValues = Object.values(cProfData);
+        charts.c3 = new Chart(document.getElementById('c3'), { 
+            type: 'bar', 
+            data: { 
+                labels: profLabels, 
+                datasets: [{ 
+                    data: profValues, 
+                    backgroundColor: profValues.map(v => v < 0 ? '#ef4444' : '#22d3ee'),
+                    borderRadius: 4
+                }]
+            }, 
+            options: barOptions('Category', true) 
+        });
+
+        destroy('c4');
+        let catAov = group(data, 'Category', 'Amount');
+        charts.c4 = new Chart(document.getElementById('c4'), { type: 'bar', data: { labels: Object.keys(catAov), datasets: [{ data: Object.values(catAov), backgroundColor: colors[3] }]}, options: barOptions('Category') });
+
+        const pOptions = (key) => ({
+            maintainAspectRatio: false,
+            layout: { padding: { right: 85, left: 10, top: 10, bottom: 10 } },
+            plugins: {
+                legend: { position: 'right', labels: { boxWidth: 8, padding: 15, font: { size: 8 } } },
+                datalabels: {
+                    formatter: (v, ctx) => {
+                        let sum = ctx.dataset.data.reduce((a, b) => a + Math.abs(b), 0);
+                        return sum > 0 ? ((Math.abs(v) * 100) / sum).toFixed(1) + "%" : "0%";
+                    },
+                    color: '#fff', align: 'end', anchor: 'end', offset: 12, font: { weight: 'bold', size: 8.5 }
+                }
+            },
+            onClick: (e, el) => { if(el.length) { drillDownFilter = {key, value: charts[Object.keys(charts).find(k => charts[k].canvas.id === e.chart.canvas.id)].data.labels[el[0].index]}; document.getElementById('resetFilter').style.display='inline-block'; updateCharts(); }}
+        });
+        destroy('c5');
+        let catPie = group(data, 'Category', 'Quantity');
+        charts.c5 = new Chart(document.getElementById('c5'), { type: 'pie', data: { labels: Object.keys(catPie), datasets: [{ data: Object.values(catPie), backgroundColor: colors, borderJoinStyle: 'round' }]}, options: pOptions('Category') });
+        charts.c5.options.radius = '85%';
+        
+        destroy('c6');
+        let payPie = group(data, 'PaymentMode', 'Amount');
+        charts.c6 = new Chart(document.getElementById('c6'), { type: 'pie', data: { labels: Object.keys(payPie), datasets: [{ data: Object.values(payPie), backgroundColor: colors.slice().reverse() }]}, options: pOptions('PaymentMode') });
+        charts.c6.options.radius = '85%';
+    }
+</script>
+</body>
+</html>
